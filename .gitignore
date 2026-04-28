@@ -1,0 +1,69 @@
+# =========================
+# Variáveis de Ambiente (CRÍTICO)
+# =========================
+# NUNCA envie seus tokens do TMDB ou senhas do Supabase para o GitHub!
+.env
+.env.*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# Backend (Python / FastAPI)
+# =========================
+# Arquivos compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes Virtuais (Onde ficam as bibliotecas instaladas)
+venv/
+.venv/
+env/
+/lib/
+/bin/
+
+# Logs e testes do Python
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+
+# =========================
+# Frontend (Next.js / React)
+# =========================
+# Dependências do Node (Muito pesado, nunca vai pro Git)
+node_modules/
+.pnp
+.pnp.js
+
+# Pastas de build geradas pelo Next.js
+.next/
+out/
+build/
+dist/
+
+# Logs de erro de gerenciadores de pacote
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Sistema Operacional e Editores de Código
+# =========================
+# Mac OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+$RECYCLE.BIN/
+
+# Editores (VS Code, IntelliJ, etc)
+.vscode/
+.idea/
+*.swp
+*.swo
