@@ -67,3 +67,6 @@ $RECYCLE.BIN/
 .idea/
 *.swp
 *.swo
+
+# Rascunhos do Supabase Studio Local
+supabase/snippets/

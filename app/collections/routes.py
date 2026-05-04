@@ -82,25 +82,34 @@ async def show_collection(
         collection_info = col_check.data[0]
 
         library_response = supabase.table("user_library") \
-            .select("*") \
-            .eq("collection_id", collection_id) \
+            .select("*, collection_media!inner(collection_id)") \
+            .eq("collection_media.collection_id", collection_id) \
             .execute()
 
         games_response = supabase.table("games") \
-            .select("*") \
-            .eq("collection_id", collection_id) \
+            .select("*, collection_games!inner(collection_id)") \
+            .eq("collection_games.collection_id", collection_id) \
             .execute()
 
         all_items = library_response.data
+
+        for item in all_items:
+            item.pop("collection_media", None)
+
         movies = [item for item in all_items if item.get("media_type") == "movie"]
         series = [item for item in all_items if item.get("media_type") == "tv"]
+
+        all_games = games_response.data
+
+        for game in all_games:
+            game.pop("collection_games", None)
 
         return {
             "collection_details": collection_info,
             "items": {
                 "movies": movies,
                 "series": series,
-                "games": games_response.data
+                "games": all_games
             }
         }
 

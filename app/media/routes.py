@@ -13,14 +13,14 @@ from app.media.models import MediaToSave
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-router = APIRouter()
+router = APIRouter(prefix="/add", tags=["Add"])
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN").strip()
 
 if not TMDB_TOKEN:
     raise ValueError("Token TMDB não encontrado!")
 
-@router.post("/add/media")
+@router.post("/media")
 @limiter.limit("30/minute")
 async def add_media_on_lib(
     request: Request,
@@ -53,7 +53,7 @@ async def add_media_on_lib(
             .execute()
         
         if not collection_check.data:
-            logger.warning(f"Tentativa de injeção em coleção! Usuário: {user_id} | Coleção: {movie.collection_id}")
+            logger.warning(f"Tentativa de injeção em coleção! Usuário: {user_id} | Coleção: {media.collection_id}")
             
             raise HTTPException(
                 status_code=403,
@@ -67,16 +67,29 @@ async def add_media_on_lib(
         "title": official_title,
         "poster_path": tmdb_oficial.get("poster_path"),
         "watched": media.watched,    
-        "collection_id": media.collection_id,
     }
 
     try:
         response = supabase.table("user_library").insert(db_data).execute()
+        saved_media = response.data[0]
+
+        if media.collection_id:
+            link_data = {
+                "collection_id": media.collection_id,
+                "library_item_id": saved_media["id"]
+            }
+
+            supabase.table("collection_media").insert(link_data).execute()
+
+            saved_media["collection_ids"] = [media.collection_id]
+
+        else:
+            saved_media["collection_ids"] = []
 
         return {
             "status": "sucesso",
             "message": "Item adicionada à sua biblioteca!",
-            "media_saved": response.data[0]
+            "media_saved": saved_media
         }
 
     except Exception as e:

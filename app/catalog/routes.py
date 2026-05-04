@@ -7,9 +7,9 @@ from app.database.database import supabase
 
 logger = logging.getLogger(__name__)
 
-router  = APIRouter()
+router  = APIRouter(prefix="/catalog", tags=["Catalog"])
 
-@router.get("/catalog/all")
+@router.get("/all")
 @limiter.limit("60/minute")
 async def get_full_catalog(
     request: Request,

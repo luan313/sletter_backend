@@ -1,4 +1,3 @@
-# app/collections/models.py
 from pydantic import BaseModel, Field
 
 class CollectionToCreate(BaseModel):

@@ -13,14 +13,14 @@ from app.games.models import GameToSave
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-router = APIRouter()
+router = APIRouter(prefix="/add", tags=["Add"])
 
 RAWG_API_KEY = os.getenv("RAWG_API_KEY", "").strip()
 
 if not RAWG_API_KEY:
     raise ValueError("Chave RAWG não encontrada!")
 
-@router.post("/add/game")
+@router.post("/game")
 @limiter.limit("30/minute") 
 async def add_game_on_lib(
     request: Request,
@@ -60,16 +60,29 @@ async def add_game_on_lib(
         "title": rawg_oficial.get("name"),
         "background_image": rawg_oficial.get("background_image"),
         "status": game.status,     
-        "collection_id": game.collection_id,
     }
 
     try:
         response = supabase.table("games").insert(db_data).execute()
+        saved_game = response.data[0]
+
+        if game.collection_id:
+            link_data = {
+                "collection_id": game.collection_id,
+                "game_id": saved_game["id"],
+            }
+
+            supabase.table("collection_games").insert(link_data).execute()
+
+            saved_game["collection_ids"] = [game.collection_id]
+
+        else:
+            saved_game["collection_ids"] = []
 
         return {
             "status": "sucesso",
             "message": "Jogo adicionado à sua biblioteca!",
-            "game_saved": response.data[0]
+            "game_saved": saved_game
         }
 
     except Exception as e:
