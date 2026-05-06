@@ -1,0 +1,23 @@
+<html>
+  <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #dad7cd; padding: 40px 20px;">
+    <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(52,78,65,0.12);">
+      <div style="background-color: #344e41; padding: 32px 24px; text-align: center;">
+        <h1 style="color: #dad7cd; font-size: 28px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sletter</h1>
+        <p style="color: #a3b18a; font-size: 14px; margin: 8px 0 0;">Sua biblioteca pessoal</p>
+      </div>
+      <div style="padding: 32px 24px;">
+        <h2 style="color: #344e41; font-size: 20px; margin: 0 0 12px;">Confirme seu e-mail</h2>
+        <p style="color: #3a5a40; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
+          Obrigado por criar sua conta no Sletter! Clique no botão abaixo para confirmar seu endereço de e-mail e começar a organizar suas coleções.
+        </p>
+        <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup"
+           style="display: inline-block; background-color: #344e41; color: #dad7cd; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px;">
+          Confirmar e-mail
+        </a>
+        <p style="color: #6b7a6d; font-size: 12px; line-height: 1.5; margin: 24px 0 0;">
+          Se você não criou uma conta no Sletter, ignore este e-mail.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

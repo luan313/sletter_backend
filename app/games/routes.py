@@ -13,14 +13,14 @@ from app.games.models import GameToSave
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-router = APIRouter(prefix="/add", tags=["Add"])
+router = APIRouter(prefix="/game", tags=["Game"])
 
 RAWG_API_KEY = os.getenv("RAWG_API_KEY", "").strip()
 
 if not RAWG_API_KEY:
     raise ValueError("Chave RAWG não encontrada!")
 
-@router.post("/game")
+@router.post("/")
 @limiter.limit("30/minute") 
 async def add_game_on_lib(
     request: Request,
@@ -90,4 +90,78 @@ async def add_game_on_lib(
         raise HTTPException(
             status_code=500, 
             detail="Erro ao salvar o Jogo no banco de dados."
+        )
+
+@router.put('/{game_id}')
+@limiter.limit("30/minute")
+async def edit_game_on_lib(
+    request: Request,
+    game_id: str,
+    game: GameToSave,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+    
+    game_check = supabase.table("games") \
+        .select("id") \
+        .eq("id", game_id) \
+        .eq("user_id", user_id) \
+        .execute()
+    
+    if not game_check.data:
+        raise HTTPException(status_code=404, detail="Jogo não encontrado na sua biblioteca.")
+    
+    game_data = game.model_dump(exclude_unset=True)
+    
+    try:
+        response = supabase.table("games").update(game_data).eq("id", game_id).execute()
+        updated_game = response.data[0]
+        return {
+            "status": "sucesso",
+            "message": "Jogo editado com sucesso!",
+            "game_updated": updated_game
+        }
+    
+    except Exception as e:
+        logger.error(f"Erro ao editar Jogo para o usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao editar Jogo no banco de dados."
+        )
+
+@router.delete('/{game_id}')
+@limiter.limit("30/minute")
+async def delete_game_on_lib(
+    request: Request,
+    game_id: str,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+
+    try:
+        game_check = supabase.table("games") \
+            .delete() \
+            .eq("id", game_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if not game_check.data:
+            raise HTTPException(status_code=404, detail="Jogo não encontrado na sua biblioteca.")
+        
+        deleted_game = game_check.data[0]
+        
+        return {
+            "status": "sucesso",
+            "message": "Jogo deletado com sucesso!",
+            "game_deleted": deleted_game
+        }
+
+    except Exception:
+        raise
+    
+    except Exception as e:
+        logger.error(f"Erro ao deletar Jogo para o usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao deletar Jogo no banco de dados."
         )

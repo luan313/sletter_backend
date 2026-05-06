@@ -55,6 +55,77 @@ async def create_collection(
             detail="Não foi possível criar a coleção no momento."
         )
     
+@router.get("/")
+@limiter.limit("60/minute")
+async def list_user_collections(
+    request: Request,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+    logger.info(f"Usuário {user_id} buscando todas as suas coleções.")
+
+    try:
+        collections_response = supabase.table("collections") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        collections = collections_response.data
+
+        if not collections:
+            return {"collections": []}
+
+        collection_ids = [c["id"] for c in collections]
+
+        library_response = supabase.table("user_library") \
+            .select("*, collection_media!inner(collection_id)") \
+            .in_("collection_media.collection_id", collection_ids) \
+            .execute()
+
+        games_response = supabase.table("games") \
+            .select("*, collection_games!inner(collection_id)") \
+            .in_("collection_games.collection_id", collection_ids) \
+            .execute()
+
+        items_by_collection = {c["id"]: [] for c in collections}
+
+        for item in library_response.data:
+            col_media = item.pop("collection_media", [])
+            if isinstance(col_media, list):
+                for cm in col_media:
+                    c_id = cm.get("collection_id")
+                    if c_id in items_by_collection:
+                        items_by_collection[c_id].append(item.copy())
+            elif isinstance(col_media, dict):
+                c_id = col_media.get("collection_id")
+                if c_id in items_by_collection:
+                    items_by_collection[c_id].append(item.copy())
+
+        for game in games_response.data:
+            col_games = game.pop("collection_games", [])
+            if isinstance(col_games, list):
+                for cg in col_games:
+                    c_id = cg.get("collection_id")
+                    if c_id in items_by_collection:
+                        items_by_collection[c_id].append(game.copy())
+            elif isinstance(col_games, dict):
+                c_id = col_games.get("collection_id")
+                if c_id in items_by_collection:
+                    items_by_collection[c_id].append(game.copy())
+
+        for collection in collections:
+            c_id = collection["id"]
+            collection["preview_items"] = items_by_collection[c_id][:5]
+
+        return {"collections": collections}
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar coleções do usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Não foi possível buscar as coleções no momento."
+        )
+
 @router.get("/{collection_id}")
 @limiter.limit("60/minute")
 async def show_collection(
@@ -121,3 +192,4 @@ async def show_collection(
             status_code=500, 
             detail="Erro ao carregar a sua coleção. Tente novamente."
         )
+

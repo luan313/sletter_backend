@@ -1,5 +1,8 @@
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.database.database import supabase 
 

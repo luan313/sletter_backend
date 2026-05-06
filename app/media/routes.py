@@ -13,14 +13,14 @@ from app.media.models import MediaToSave
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-router = APIRouter(prefix="/add", tags=["Add"])
+router = APIRouter(prefix="/media", tags=["Media"])
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN").strip()
 
 if not TMDB_TOKEN:
     raise ValueError("Token TMDB não encontrado!")
 
-@router.post("/media")
+@router.post("/")
 @limiter.limit("30/minute")
 async def add_media_on_lib(
     request: Request,
@@ -99,3 +99,77 @@ async def add_media_on_lib(
             detail="Erro ao salvar Item no banco de dados."
         )
     
+@router.put('/{media_id}')
+@limiter.limit("30/minute")
+async def edit_media_on_lib(
+    request: Request,
+    media_id: str,
+    media: MediaToSave,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+
+    media_check = supabase.table("user_library") \
+        .select("id") \
+        .eq("id", media_id) \
+        .eq("user_id", user_id) \
+        .execute()
+    
+    if not media_check.data:
+        raise HTTPException(status_code=404, detail="Item não encontrado na sua biblioteca.")
+    
+    media_data = media.model_dump(exclude_unset=True)
+    
+    try:
+        response = supabase.table("user_library").update(media_data).eq("id", media_id).execute()
+        updated_media = response.data[0]
+
+        return {
+            "status": "sucesso",
+            "message": "Item editado com sucesso!",
+            "media_updated": updated_media
+        }
+    
+    except Exception as e:
+        logger.error(f"Erro ao editar Item para o usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao editar Item no banco de dados."
+        )
+
+@router.delete('/{media_id}')
+@limiter.limit("30/minute")
+async def delete_media_on_lib(
+    request: Request,
+    media_id: str,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+    
+    try:
+        media_check = supabase.table("user_library") \
+            .delete() \
+            .eq("id", media_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if not media_check.data:
+            raise HTTPException(status_code=404, detail="Item não encontrado na sua biblioteca.")
+
+        deleted_media = media_check.data[0]
+
+        return {
+            "status": "sucesso",
+            "message": "Item deletado com sucesso!",
+            "media_deleted": deleted_media
+        }
+
+    except Exception:
+        raise
+
+    except Exception as e:
+        logger.error(f"Erro ao deletar Item para o usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao deletar Item no banco de dados."
+        )
