@@ -5,3 +5,7 @@ class GameToSave(BaseModel):
     rawg_id: int
     status: Literal["unplayed", "playing", "completed"] = "unplayed"
     collection_id: Optional[str] = None
+
+class GameToCollection(BaseModel):
+    id: str
+    collection_id: str

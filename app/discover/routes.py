@@ -10,7 +10,7 @@ from app.auth.auth import get_login_user
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-router = APIRouter(prefix="/discover", tags=["Discover New"])
+router = APIRouter(prefix="/discover", tags=["Discover"])
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN").strip()
 if not TMDB_TOKEN:

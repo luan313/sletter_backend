@@ -6,3 +6,7 @@ class MediaToSave(BaseModel):
     media_type: Literal["movie", "tv"]
     watched: Literal["watched", "not_watched", "in_progress"] = "not_watched"
     collection_id: Optional[str] = None
+
+class MediaToCollection(BaseModel):
+    id: str
+    collection_id: str

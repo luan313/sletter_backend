@@ -3,12 +3,14 @@ import logging
 import requests
 import os
 from dotenv import load_dotenv
+from typing import List, Annotated
+from pydantic import Field
 
 from app.limiter.limiter import limiter
 from app.auth.auth import get_login_user
 from app.database.database import supabase
 
-from app.media.models import MediaToSave
+from app.media.models import MediaToSave, MediaToCollection
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,7 @@ TMDB_TOKEN = os.getenv("TMDB_TOKEN").strip()
 if not TMDB_TOKEN:
     raise ValueError("Token TMDB não encontrado!")
 
-@router.post("/")
+@router.post("/add_on_lib")
 @limiter.limit("30/minute")
 async def add_media_on_lib(
     request: Request,
@@ -98,12 +100,130 @@ async def add_media_on_lib(
             status_code=500, 
             detail="Erro ao salvar Item no banco de dados."
         )
+
+@router.post('/add_on_collection')
+@limiter.limit("30/minute")
+async def add_media_on_collection(
+    request: Request,
+    medias: Annotated[List[MediaToCollection], Field(max_length=50)],
+    user = Depends(get_login_user),
+):
+    user_id = user["user_id"]
+
+    if not medias:
+        raise HTTPException(status_code=400, detail = "A lista de mídias está vazia.")
+
+    try:
+        target_collection_id = medias[0].collection_id
+
+        if not target_collection_id:
+            raise HTTPException(status_code=400 ,detail="ID da coleção não fornecido.")
+
+        collection_check = supabase.table("collections") \
+            .select("id") \
+            .eq("id", target_collection_id) \
+            .eq("user_id", user_id) \
+            .execute()
+
+        if not collection_check.data:
+            raise HTTPException(status_code=404, detail="Coleção não encontrada.")
+
+        processed_media = []
+
+        for media in medias:
+            if media.collection_id != target_collection_id:
+                raise HTTPException(status_code=400, detail="Todas as mídias devem pertencer a mesma coleção.")
+
+            media_check = supabase.table("user_library") \
+                .select("id") \
+                .eq("id", media.id) \
+                .eq("user_id", user_id) \
+                .execute()
+
+            if not media_check.data:
+                raise HTTPException(status_code=404, detail="Mídia não encontrada na sua biblioteca.")
+
+            db_media_id = media_check.data[0]["id"]
+
+            link_data = {
+                "collection_id": media.collection_id,
+                "library_item_id": db_media_id,
+            }
+
+            supabase.table("collection_media").insert(link_data).execute()
+
+            processed_media.append(media.model_dump())
+
+        return {
+            "status": "sucesso",
+            "message": f"{len(processed_media)} mídia(s) adicionada(s) à coleção com sucesso!",
+            "media_added": processed_media
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Erro ao adicionar Mídia à coleção para o usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao adicionar Mídia à coleção no banco de dados."
+        )
+
+@router.get('/{tmdb_id}')
+@limiter.limit("100/minute")
+async def get_media_details(
+    request:Request,
+    tmdb_id: str,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+
+    try:
+        media_query = supabase.table("user_library") \
+            .select("id, tmdb_id, media_type, title, poster_path, watched, created_at") \
+            .eq("tmdb_id", tmdb_id) \
+            .eq("user_id", user_id) \
+            .execute()
+
+        if not media_query.data:
+            raise HTTPException(
+                status_code=404,
+                detail="Esta mídia não está na sua biblioteca."
+            )
+
+        media_data = media_query.data[0]
+        db_media_id = media_data["id"]
+
+        collections_query = supabase.table("collection_media") \
+            .select("collection_id") \
+            .eq("library_item_id", db_media_id) \
+            .execute()
+
+        collection_ids = [col["collection_id"] for col in collections_query.data] if collections_query.data else []
+
+        media_data["in_collections"] = collection_ids
+
+        return {
+            "status": "sucesso",
+            "media_details": media_data
+        }
     
-@router.put('/{media_id}')
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar detalhes da mídia {tmdb_id} para o usuário {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro interno ao buscar detalhes da mídia."
+        )
+    
+@router.put('/{tmdb_id}')
 @limiter.limit("30/minute")
 async def edit_media_on_lib(
     request: Request,
-    media_id: str,
+    tmdb_id: str,
     media: MediaToSave,
     user = Depends(get_login_user)
 ):
@@ -111,7 +231,7 @@ async def edit_media_on_lib(
 
     media_check = supabase.table("user_library") \
         .select("id") \
-        .eq("id", media_id) \
+        .eq("id", tmdb_id) \
         .eq("user_id", user_id) \
         .execute()
     
@@ -121,7 +241,7 @@ async def edit_media_on_lib(
     media_data = media.model_dump(exclude_unset=True)
     
     try:
-        response = supabase.table("user_library").update(media_data).eq("id", media_id).execute()
+        response = supabase.table("user_library").update(media_data).eq("id", tmdb_id).execute()
         updated_media = response.data[0]
 
         return {
@@ -137,11 +257,11 @@ async def edit_media_on_lib(
             detail="Erro ao editar Item no banco de dados."
         )
 
-@router.delete('/{media_id}')
+@router.delete('/{tmdb_id}')
 @limiter.limit("30/minute")
 async def delete_media_on_lib(
     request: Request,
-    media_id: str,
+    tmdb_id: str,
     user = Depends(get_login_user)
 ):
     user_id = user["user_id"]
@@ -149,7 +269,7 @@ async def delete_media_on_lib(
     try:
         media_check = supabase.table("user_library") \
             .delete() \
-            .eq("id", media_id) \
+            .eq("id", tmdb_id) \
             .eq("user_id", user_id) \
             .execute()
         
