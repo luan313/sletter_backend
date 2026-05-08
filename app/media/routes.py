@@ -10,7 +10,7 @@ from app.limiter.limiter import limiter
 from app.auth.auth import get_login_user
 from app.database.database import supabase
 
-from app.media.models import MediaToSave, MediaToCollection
+from app.media.models import MediaToSave, MediaToCollection, WatchedStatus
 
 logger = logging.getLogger(__name__)
 
@@ -223,45 +223,41 @@ async def get_media_details(
 @limiter.limit("30/minute")
 async def edit_media_on_lib(
     request: Request,
-    tmdb_id: str,
-    media: MediaToSave,
+    tmdb_id: int,
+    status: WatchedStatus,
     user = Depends(get_login_user)
 ):
     user_id = user["user_id"]
 
     media_check = supabase.table("user_library") \
         .select("id") \
-        .eq("id", tmdb_id) \
+        .eq("tmdb_id", tmdb_id) \
         .eq("user_id", user_id) \
         .execute()
     
     if not media_check.data:
         raise HTTPException(status_code=404, detail="Item não encontrado na sua biblioteca.")
     
-    media_data = media.model_dump(exclude_unset=True)
-    
     try:
-        response = supabase.table("user_library").update(media_data).eq("id", tmdb_id).execute()
-        updated_media = response.data[0]
+        supabase.table("user_library").update(status.model_dump()).eq("tmdb_id", tmdb_id).eq("user_id", user_id).execute()
 
         return {
             "status": "sucesso",
-            "message": "Item editado com sucesso!",
-            "media_updated": updated_media
+            "message": "Status do item atualizado com sucesso!"
         }
     
     except Exception as e:
-        logger.error(f"Erro ao editar Item para o usuário {user_id}: {e}")
+        logger.error(f"Erro ao editar status do Item para o usuário {user_id}: {e}")
         raise HTTPException(
             status_code=500, 
-            detail="Erro ao editar Item no banco de dados."
+            detail="Erro ao editar status do Item no banco de dados."
         )
 
 @router.delete('/{tmdb_id}')
 @limiter.limit("30/minute")
 async def delete_media_on_lib(
     request: Request,
-    tmdb_id: str,
+    tmdb_id: int,
     user = Depends(get_login_user)
 ):
     user_id = user["user_id"]
@@ -269,7 +265,7 @@ async def delete_media_on_lib(
     try:
         media_check = supabase.table("user_library") \
             .delete() \
-            .eq("id", tmdb_id) \
+            .eq("tmdb_id", tmdb_id) \
             .eq("user_id", user_id) \
             .execute()
         
@@ -284,7 +280,7 @@ async def delete_media_on_lib(
             "media_deleted": deleted_media
         }
 
-    except Exception:
+    except HTTPException:
         raise
 
     except Exception as e:

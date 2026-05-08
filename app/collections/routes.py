@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 import logging
+from pydantic import Field
 
 from app.limiter.limiter import limiter
 from app.auth.auth import get_login_user
@@ -193,3 +194,77 @@ async def show_collection(
             detail="Erro ao carregar a sua coleção. Tente novamente."
         )
 
+@router.put("/{collection_id}")
+@limiter.limit("30/minute")
+async def edit_collection(
+    request: Request,
+    collection_id: str,
+    collection: CollectionToCreate,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+    logger.info(f"Usuário {user_id} atualizando a coleção: {collection_id}")
+
+    try:
+        col_check = supabase.table("collections") \
+            .select("id") \
+            .eq("id", collection_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if not col_check.data:
+            logger.warning(f"Acesso negado ou coleção inexistente: {collection_id} | User: {user_id}")
+            raise HTTPException(
+                status_code=404, 
+                detail="Coleção não encontrada ou você não tem permissão para acessá-la."
+            )
+        
+        supabase.table("collections").update({"name": collection.name}).eq("id", collection_id).eq("user_id", user_id).execute()
+
+        return {
+            "status": "sucesso",
+            "message": "Coleção atualizada com sucesso!"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao editar a coleção {collection_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao editar a sua coleção. Tente novamente."
+        )
+
+@router.delete("/{collection_id}")
+@limiter.limit("30/minute")
+async def delete_collection(
+    request: Request,
+    collection_id: str,
+    user = Depends(get_login_user)
+):
+    user_id = user["user_id"]
+    logger.info(f"Usuário {user_id} deletando a coleção: {collection_id}")
+
+    try:
+        delete_response = supabase.table("collections").delete().eq("id", collection_id).eq("user_id", user_id).execute()
+
+        if not delete_response.data:
+            logger.warning(f"Acesso negado ou coleção inexistente: {collection_id} | User: {user_id}")
+            raise HTTPException(
+                status_code=404, 
+                detail="Coleção não encontrada ou você não tem permissão para acessá-la."
+            )
+
+        return {
+            "status": "sucesso",
+            "message": "Coleção deletada com sucesso!"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao deletar a coleção {collection_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao deletar a sua coleção. Tente novamente."
+        )

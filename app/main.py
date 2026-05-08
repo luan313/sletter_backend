@@ -18,6 +18,7 @@ from app.catalog.routes import router as CatalogRouter
 from app.collections.routes import router as CollectionRouter
 from app.games.routes import router as GameRouter
 from app.discover.routes import router as DiscoverRouter
+from app.search.routes import router as SearchRouter
 
 app = FastAPI()
 
@@ -37,3 +38,4 @@ app.include_router(CatalogRouter)
 app.include_router(CollectionRouter)
 app.include_router(GameRouter)
 app.include_router(DiscoverRouter)
+app.include_router(SearchRouter)

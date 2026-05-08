@@ -10,7 +10,7 @@ from app.limiter.limiter import limiter
 from app.auth.auth import get_login_user
 from app.database.database import supabase
 
-from app.games.models import GameToSave, GameToCollection
+from app.games.models import GameToSave, GameToCollection, GameStatus
 
 logger = logging.getLogger(__name__)
 
@@ -216,44 +216,44 @@ async def get_game_details(
 @limiter.limit("30/minute")
 async def edit_game_on_lib(
     request: Request,
-    rawg_id: str,
-    game: GameToSave,
+    rawg_id: int,
+    status: GameStatus,
     user = Depends(get_login_user)
 ):
     user_id = user["user_id"]
     
-    game_check = supabase.table("games") \
-        .select("id") \
-        .eq("id", rawg_id) \
-        .eq("user_id", user_id) \
-        .execute()
-    
-    if not game_check.data:
-        raise HTTPException(status_code=404, detail="Jogo não encontrado na sua biblioteca.")
-    
-    game_data = game.model_dump(exclude_unset=True)
-    
     try:
-        response = supabase.table("games").update(game_data).eq("id", rawg_id).execute()
-        updated_game = response.data[0]
+        game_check = supabase.table("games") \
+            .select("id") \
+            .eq("rawg_id", rawg_id) \
+            .eq("user_id", user_id) \
+            .execute()
+    
+        if not game_check.data:
+            raise HTTPException(status_code=404, detail="Jogo não encontrado na sua biblioteca.")
+    
+        supabase.table("games").update(status.model_dump()).eq("rawg_id", rawg_id).eq("user_id", user_id).execute()
+
         return {
             "status": "sucesso",
-            "message": "Jogo editado com sucesso!",
-            "game_updated": updated_game
+            "message": "Status do jogo atualizado com sucesso!"
         }
+
+    except HTTPException:
+        raise
     
     except Exception as e:
-        logger.error(f"Erro ao editar Jogo para o usuário {user_id}: {e}")
+        logger.error(f"Erro ao editar status do Jogo para o usuário {user_id}: {e}")
         raise HTTPException(
             status_code=500, 
-            detail="Erro ao editar Jogo no banco de dados."
+            detail="Erro ao editar status do Jogo no banco de dados."
         )
 
 @router.delete('/{rawg_id}')
 @limiter.limit("30/minute")
 async def delete_game_on_lib(
     request: Request,
-    rawg_id: str,
+    rawg_id: int,
     user = Depends(get_login_user)
 ):
     user_id = user["user_id"]
@@ -261,7 +261,7 @@ async def delete_game_on_lib(
     try:
         game_check = supabase.table("games") \
             .delete() \
-            .eq("id", rawg_id) \
+            .eq("rawg_id", rawg_id) \
             .eq("user_id", user_id) \
             .execute()
         
@@ -272,11 +272,11 @@ async def delete_game_on_lib(
         
         return {
             "status": "sucesso",
-            "message": "Jogo deletado com sucesso!",
-            "game_deleted": deleted_game
+            "message": "Jogo removido com sucesso!",
+            "game_removed": deleted_game
         }
 
-    except Exception:
+    except HTTPException:
         raise
     
     except Exception as e:
